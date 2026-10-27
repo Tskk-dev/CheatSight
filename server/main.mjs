@@ -17,10 +17,10 @@ export function createApp(){
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
-  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-src https://docs.google.com https://accounts.google.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
+  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-src 'self' https://docs.google.com https://accounts.google.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
   if(secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
   try{
-   if(url.pathname==='/health'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({ok:true,storage:'temporary-memory',startedAt}));return;}
+   if(url.pathname==='/health'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({app:'CheatSight',ok:true,storage:'temporary-memory',startedAt}));return;}
    if(url.pathname==='/api/monitor'){
     if(!['GET','POST'].includes(req.method)){res.writeHead(405,{'Allow':'GET, POST'});res.end();return;}
     let body='';if(req.method==='POST'){
@@ -42,6 +42,7 @@ export function createApp(){
    let path=resolve(staticRoot,'.'+pathname);
    if(path!==staticRoot&&!path.startsWith(staticRoot+sep)){res.writeHead(403);res.end('Forbidden');return;}
    if(path===staticRoot||pathname.startsWith('/join/'))path=resolve(staticRoot,'index.html');
+   if(pathname==='/practice-form')path=resolve(staticRoot,'practice-form.html');
    const info=await stat(path).catch(()=>null);if(!info?.isFile()){res.writeHead(404);res.end('Not found');return;}
    res.setHeader('Content-Type',types[extname(path)]||'application/octet-stream');res.setHeader('Cache-Control',pathname.startsWith('/assets/')?'public, max-age=31536000, immutable':'no-cache');
    if(req.method==='HEAD')res.end();else res.end(await readFile(path));

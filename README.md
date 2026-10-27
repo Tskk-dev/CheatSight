@@ -2,6 +2,14 @@
 
 Google Forms with transparent activity monitoring and downloadable facilitator logs. Built for Render's free Node web services. No persistent disk, database service, API key, or account system is required.
 
+## Start locally
+
+Run `npm ci` once if dependencies are not installed, then `npm run local` (or `npm run dev`). On Windows, double-click `Start-CheatSight.cmd`. Open **http://localhost:3000** and keep the server running. One command builds the current app and starts both the page and its API.
+
+The dashboard starts empty. Choose **Start local test** to create a real monitored session without a Google Forms link. Open its student link in another tab, enter a name, acknowledge monitoring, switch away and return, then check the facilitator dashboard and download the real event log. The local test form is served inside an iframe; its answers are not saved. Google Forms sessions use the same monitoring flow.
+
+To use your own form, choose **Create session** and paste its published Google Forms responder link. Google Forms still needs an internet connection and the correct Google account permissions.
+
 ## Deploy on Render
 
 1. In Render, choose **New → Blueprint** and connect **Tskk-dev/CheatSight**.
@@ -57,7 +65,7 @@ npm run build
 npm start
 ```
 
-Open `http://localhost:3000`. The server serves the built React app and its monitoring API. For frontend development, keep `npm start` running in one terminal and run `npm run dev` in another; Vite proxies `/api` to port 3000. Restarting the backend intentionally clears all sessions.
+Open `http://localhost:3000`. The server serves the built React app and its monitoring API. `npm run local` and `npm run dev` build and start both together; restarting the command applies source edits. Restarting the backend intentionally clears all sessions.
 
 ## Verify
 

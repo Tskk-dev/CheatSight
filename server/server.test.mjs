@@ -14,6 +14,12 @@ test('temporary sessions, facilitator isolation, telemetry, downloads, and reset
   const owner=await request();const cookie=owner.cookie;assert.ok(cookie);assert.equal(owner.data.signedIn,true);
   const {data:{id}}=await request({action:'create',title:'QA session',formUrl:'https://docs.google.com/forms/d/e/example/viewform',duration:45,mouse:true},{cookie});
   await request({action:'create',title:'Unsafe form',formUrl:'https://evil.test/',duration:45},{cookie,status:400});
+  const practice=(await request({action:'create',title:'Local monitoring test',source:'practice',duration:15,mouse:true},{cookie})).data;
+  const practiceSession=(await request(undefined,{query:'?view=join&id='+practice.id})).data.session;
+  assert.equal(practiceSession.form_url,'/practice-form');
+  const practicePage=await fetch(origin+'/practice-form');assert.equal(practicePage.status,200);assert.ok((await practicePage.text()).includes('id="test-form"'));
+  assert.equal((await fetch(origin+'/practice-form.js')).status,200);
+  await request(undefined,{query:'?id='+practice.id,status:404});
   await request({action:'create',title:'CSRF',formUrl:'https://docs.google.com/forms/d/e/example/viewform',duration:45},{cookie,status:403,foreign:true});
   await request(undefined,{query:'?id='+id,status:404});
   await request({action:'end',sessionId:id},{status:404});
@@ -33,7 +39,7 @@ test('temporary sessions, facilitator isolation, telemetry, downloads, and reset
   await request({action:'end',sessionId:id},{cookie});
   await request({action:'join',sessionId:id,name:'Late student',consent:true},{status:409});
   const health=await fetch(origin+'/health');assert.equal(health.status,200);assert.equal((await health.json()).storage,'temporary-memory');
-  const staticResponse=await fetch(origin+'/');assert.equal(staticResponse.status,200);assert.ok((await staticResponse.text()).includes('CheatSight'));assert.ok(staticResponse.headers.get('content-security-policy').includes('frame-src https://docs.google.com'));
+  const staticResponse=await fetch(origin+'/');assert.equal(staticResponse.status,200);assert.ok((await staticResponse.text()).includes('CheatSight'));assert.ok(staticResponse.headers.get('content-security-policy').includes("frame-src 'self' https://docs.google.com"));
   const route=await fetch(origin+'/join/'+id);assert.equal(route.status,200);assert.ok((await route.text()).includes('/assets/'));
   await new Promise(r=>app.close(r));
   app=createApp();await new Promise(r=>app.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+app.address().port;
