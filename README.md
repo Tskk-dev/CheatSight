@@ -1,6 +1,6 @@
 # CheatSight
 
-Google Forms with transparent activity monitoring and downloadable facilitator logs. Built for Render's free Node web services. No persistent disk, database service, API key, or account system is required.
+Google Forms tests and Google Meet sessions with transparent activity monitoring and downloadable facilitator logs. Built for Render's free Node web services. No persistent disk, database service, API key, or account system is required.
 
 ## Start locally
 
@@ -14,7 +14,7 @@ To use your own form, choose **Create session** and paste its published Google F
 
 1. In Render, choose **New → Blueprint** and connect **Tskk-dev/CheatSight**.
 2. Render reads `render.yaml`. Keep the **Free** web service plan and deploy.
-3. Open the generated `onrender.com` URL. Create a session with your published Google Forms responder link and share the generated student link.
+3. Open the generated `onrender.com` URL. Choose Test or Google Meet, add the appropriate link, and share the generated student link.
 
 Alternatively, create a **Node Web Service** using this repository:
 
@@ -34,7 +34,7 @@ Render's free service can sleep after inactivity and can restart. **All session 
 
 ## Facilitator flow
 
-1. Create a session, paste a full published responder URL like `https://docs.google.com/forms/d/e/FORM_ID/viewform`, and choose whether to include mouse activity. Editor URLs and `forms.gle` short links are rejected; use the full responder link.
+1. Create a session and choose **Test** or **Google Meet**. Test requires a full published responder URL like `https://docs.google.com/forms/d/e/FORM_ID/viewform`. Google Meet requires a meeting URL like `https://meet.google.com/abc-defg-hij` and does not require a Google Form. Choose whether to include mouse activity. Form editor URLs and `forms.gle` short links are rejected; use the full responder link.
 2. Copy the student link. Students enter a display name and acknowledge the monitoring notice before collection starts.
 3. Keep the dashboard open to see activity refresh every five seconds. Select a student for their event timeline. Search or filter the student table.
 4. Choose **Download logs** to save the complete chronological event log as CSV. **Session options → Download complete report (JSON)** also includes student summaries and session details. Downloads include every student in the selected session, regardless of the current table filter.
@@ -42,7 +42,21 @@ Render's free service can sleep after inactivity and can restart. **All session 
 
 Your browser receives a random, HttpOnly facilitator cookie. Only that browser can view or end its sessions. Other facilitators get separate workspaces. There is no sign-up, password, or account recovery. Clearing cookies or switching browsers loses facilitator access to existing sessions. Share **student links only**, not browser cookies. Students cannot use their participant tokens to read facilitator logs.
 
-The initial dashboard contains clearly labeled sample data. `/join/demo` is a local sample student experience; it does not send monitoring data to the server.
+The initial dashboard is empty. `/join/demo` is a local sample student experience; it does not send monitoring data to the server.
+
+## Google Meet sessions
+
+Select **Google Meet** in the session type selector and paste the meeting link. No Google Form is required. Meet opens in a separate tab. To monitor whether students switch away from the assigned Meet tab/window, each student needs the included **Chrome/Edge extension**. Google API credentials are not required.
+
+The student page links to `CheatSight-extension.zip` and explains installation. Unzip it, open `chrome://extensions` or `edge://extensions`, enable Developer mode, choose **Load unpacked**, and select the unzipped folder. Open the extension, paste the CheatSight student session link, enter a name, acknowledge monitoring, and grant access to that specific CheatSight site. The host permission for Google Meet allows reading only matching Meet tab URLs; no broad browsing-history permission or content script is requested. The optional site permission is requested for the chosen CheatSight origin when connecting, not all websites at installation.
+
+Once connected, open the assigned call. The extension sends an active/away event when the assigned Meet tab/window gains or loses focus. Switching to another tab, another browser window, another app, minimizing, or closing the assigned tab is reported as away once the session has started observing Meet. A different Meet meeting does not count as the assigned meeting. Before the assigned tab is first active, the dashboard shows **Waiting for Meet**. Use **Finish & stop monitoring** in the extension when done. If the server is offline, the extension queues events in browser-session memory and retries. Restarting the browser clears that pairing; connect again. Chrome may delay the 30-second heartbeat; a stale extension heartbeat becomes **No recent signal** after 90 seconds. The teacher can end the session; the extension stops syncing when it receives that response.
+
+CheatSight does not read audio, video, chat, answers, mouse movements, keystrokes, or URLs of other websites. A visible meeting tab does not prove attendance or attention, and away events do not prove cheating. Monitoring is browser-reported and can be disabled or interrupted by the student. Uninstalling/disabling the extension, a terminated browser, and network outages can interrupt or lose the final events. Logs remain temporary on the server. The ZIP is an unpacked extension for testing; it is not published in either browser's extension store, and managed school devices may block unpacked installation. CSV logs identify the session type; JSON includes the Meet link and monitoring source.
+
+The extension source is in `extension/`. After edits, run `python scripts/package-extension.py` to refresh the downloadable ZIP before building. `npm test` executes the actual extension background against simulated browser tab/window APIs and the real HTTP backend. Installation and physical tab switching still require a live Chrome/Edge check.
+
+Test mode continues to use the embedded Google Forms view. The local practice form is also a Test session.
 
 ## What is monitored
 
@@ -51,7 +65,7 @@ The initial dashboard contains clearly labeled sample data. `/join/demo` is a lo
 - Optional pointer movement counts **outside** the embedded form, sampled at most ten times per second and sent in batches with ten-second heartbeats.
 - Join time, connection recency, optional fullscreen changes, and student-declared completion.
 
-Google Forms is cross-origin. The surrounding page cannot read answers, keystrokes, clicks, mouse movement inside the iframe, or whether the form was submitted. No screenshots, cursor coordinates, other-tab URLs, or screen content are collected. Restricted forms may require the student's Google account. Students must submit inside Google Forms before finishing the monitoring session. Fullscreen is optional; the planned duration is a guide, not an automatic timer.
+Google Forms is cross-origin; Google Meet runs in a separate tab with optional student-installed extension monitoring. The surrounding page cannot read answers, keystrokes, clicks, mouse movement inside the iframe, or whether the form was submitted. No screenshots, cursor coordinates, other-tab URLs, or screen content are collected. Restricted forms may require the student's Google account. Students must submit inside Google Forms before finishing the monitoring session. Fullscreen is optional; the planned duration is a guide, not an automatic timer.
 
 Activity is browser-reported and may be incomplete, blocked, or disabled. A hidden page can mean a tab switch, minimized browser, or app switch. It cannot prove cheating or attention. “No recent signal” may reflect disconnection or browser timer throttling. Unsent events retry while the tab stays open; a browser crash or closing while offline may lose the last events. Local student counters reset on reload; synced server events remain until the temporary store resets or expires. Sessions accept up to 300 joins; classroom-scale load has not been tested. The dashboard currently polls the complete event history, suitable for small sessions; add aggregation before larger deployments.
 

@@ -5,8 +5,9 @@ import {resolve,extname,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createStore} from './store.mjs';
 import {monitor} from '../lib/monitor-api.mjs';
+import {isExtensionOrigin} from '../lib/monitor.mjs';
 
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.woff2':'font/woff2'};
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.woff2':'font/woff2','.zip':'application/zip'};
 export function createApp(){
  const db=createStore(),startedAt=Date.now(),staticRoot=resolve(fileURLToPath(new URL('../dist',import.meta.url)));
  const server=http.createServer(async(req,res)=>{
@@ -22,9 +23,12 @@ export function createApp(){
   try{
    if(url.pathname==='/health'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({app:'CheatSight',ok:true,storage:'temporary-memory',startedAt}));return;}
    if(url.pathname==='/api/monitor'){
+    const extension=isExtensionOrigin(req.headers.origin);
+    if(extension){res.setHeader('Access-Control-Allow-Origin',req.headers.origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');}
+    if(req.method==='OPTIONS'&&extension){res.writeHead(204);res.end();return;}
     if(!['GET','POST'].includes(req.method)){res.writeHead(405,{'Allow':'GET, POST'});res.end();return;}
     let body='';if(req.method==='POST'){
-     if(req.headers.origin&&req.headers.origin!==origin){res.writeHead(403,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Cross-site request rejected.'}));return;}
+     if(req.headers.origin&&req.headers.origin!==origin&&!extension){res.writeHead(403,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Cross-site request rejected.'}));return;}
      for await(const chunk of req){body+=chunk.toString();if(Buffer.byteLength(body)>48000){res.writeHead(413,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'Request too large.'}));return;}}
     }
     const match=(req.headers.cookie||'').match(/(?:^|;\s*)cheatsight_owner=([A-Za-z0-9_-]{43})(?:;|$)/);
@@ -33,7 +37,7 @@ export function createApp(){
     const user={userId:createHash('sha256').update(credential).digest('hex'),displayName:'Facilitator'};
     const headers=new Headers();for(const [name,value]of Object.entries(req.headers))if(typeof value==='string')headers.set(name,value);
     const request=new Request(url,{method:req.method,headers,...(req.method==='POST'?{body}:{})});
-    const response=await monitor(request,db,async()=>user);
+    const response=await monitor(request,db,async()=>extension?null:user);
     res.statusCode=response.status;response.headers.forEach((value,name)=>res.setHeader(name,value));res.end(await response.text());return;
    }
    if(!['GET','HEAD'].includes(req.method)){res.writeHead(405);res.end();return;}

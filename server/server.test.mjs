@@ -12,11 +12,26 @@ test('temporary sessions, facilitator isolation, telemetry, downloads, and reset
  };
  try{
   const owner=await request();const cookie=owner.cookie;assert.ok(cookie);assert.equal(owner.data.signedIn,true);
-  const {data:{id}}=await request({action:'create',title:'QA session',formUrl:'https://docs.google.com/forms/d/e/example/viewform',duration:45,mouse:true},{cookie});
+  const {data:{id}}=await request({action:'create',title:'QA session',formUrl:'https://docs.google.com/forms/d/e/example/viewform',meetUrl:'https://meet.google.com/abc-defg-hij?authuser=1',duration:45,mouse:true},{cookie});
+  await request({action:'create',title:'Unsafe Meet',source:'practice',meetUrl:'https://evil.test/abc-defg-hij',duration:45},{cookie,status:400});
   await request({action:'create',title:'Unsafe form',formUrl:'https://evil.test/',duration:45},{cookie,status:400});
   const practice=(await request({action:'create',title:'Local monitoring test',source:'practice',duration:15,mouse:true},{cookie})).data;
   const practiceSession=(await request(undefined,{query:'?view=join&id='+practice.id})).data.session;
   assert.equal(practiceSession.form_url,'/practice-form');
+  assert.equal(practiceSession.meet_url,null);
+  assert.equal(practiceSession.kind,'test');
+  await request({action:'create',title:'Missing Meet link',kind:'meet',duration:15},{cookie,status:400});
+  await request({action:'create',title:'Invalid mode',kind:'other',source:'practice',duration:15},{cookie,status:400});
+  const meeting=(await request({action:'create',title:'Meet session',kind:'meet',meetUrl:'https://meet.google.com/xyz-abcd-efg',duration:15,mouse:true},{cookie})).data;
+  const meetingSession=(await request(undefined,{query:'?view=join&id='+meeting.id})).data.session;
+  assert.equal(meetingSession.kind,'meet');assert.equal(meetingSession.form_url,'');assert.equal(meetingSession.meet_url,'https://meet.google.com/xyz-abcd-efg');
+  await request({action:'join',sessionId:meeting.id,name:'Unmonitored website join',consent:true},{status:409});
+  const meetingStudent=(await request({action:'join',sessionId:meeting.id,name:'Meet student',consent:true,source:'meet_extension'})).data;assert.ok(meetingStudent.token);
+  await request({action:'telemetry',participantId:meetingStudent.participantId,state:'visible',events:[{id:crypto.randomUUID(),type:'pointer',at:Date.now(),value:1}]},{token:meetingStudent.token,status:400});
+  await request(undefined,{query:'?id='+meeting.id,status:404});
+  const meetingData=(await request(undefined,{cookie,query:'?id='+meeting.id})).data;
+  assert.ok(logCsv(meetingSession,meetingData.participants,meetingData.events).includes('"Google Meet"'));
+  assert.equal(JSON.parse(reportJson(meetingSession,meetingData.participants,meetingData.events)).session.kind,'meet');
   const practicePage=await fetch(origin+'/practice-form');assert.equal(practicePage.status,200);assert.ok((await practicePage.text()).includes('id="test-form"'));
   assert.equal((await fetch(origin+'/practice-form.js')).status,200);
   await request(undefined,{query:'?id='+practice.id,status:404});
@@ -24,6 +39,7 @@ test('temporary sessions, facilitator isolation, telemetry, downloads, and reset
   await request(undefined,{query:'?id='+id,status:404});
   await request({action:'end',sessionId:id},{status:404});
   const publicSession=(await request(undefined,{query:'?view=join&id='+id})).data.session;assert.ok(publicSession.form_url.endsWith('?embedded=true'));
+  assert.equal(publicSession.meet_url,'https://meet.google.com/abc-defg-hij');
   await request({action:'join',sessionId:id,name:'QA Student',consent:false},{status:400});
   const p=(await request({action:'join',sessionId:id,name:'=FORMULA Student',consent:true})).data;
   const at=Date.now(),events=[{id:crypto.randomUUID(),type:'hidden',at,value:0},{id:crypto.randomUUID(),type:'visible',at:at+10,value:0},{id:crypto.randomUUID(),type:'form_focus',at:at+11,value:0},{id:crypto.randomUUID(),type:'pointer',at:at+12,value:8}];
@@ -33,6 +49,7 @@ test('temporary sessions, facilitator isolation, telemetry, downloads, and reset
   await request(body,{token:p.token});await request(body,{token:p.token});
   const data=(await request(undefined,{cookie,query:'?id='+id})).data;
   assert.equal(data.events.length,5);assert.equal(data.participants.length,1);assert.equal(data.participants[0].token_hash,undefined);assert.equal(data.participants[0].state,'form');
+  assert.equal(data.sessions.find(s=>s.id===id).meet_url,'https://meet.google.com/abc-defg-hij');
   const csv=logCsv(publicSession,data.participants,data.events);assert.equal(csv.split('\r\n').length,6);assert.ok(csv.includes("'=FORMULA Student"));assert.ok(csv.includes('form_focus'));assert.ok(csv.includes('pointer'));
   const json=JSON.parse(reportJson(publicSession,data.participants,data.events));assert.equal(json.students[0].switches,1);assert.equal(json.students[0].moves,8);assert.equal(json.events.length,5);
   const finish=(await request({...body,events:[{id:crypto.randomUUID(),type:'finished',at:Date.now(),value:0}]},{token:p.token})).data;assert.equal(finish.ended,true);

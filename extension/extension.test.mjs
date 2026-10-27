@@ -1,0 +1,50 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createApp} from '../server/main.mjs';
+import {sessionLink,meetIsActive} from './state.mjs';
+const id='11111111-1111-4111-8111-111111111111';
+test('session-link validation and assigned Meet window matching',()=>{
+ assert.equal(sessionLink('http://localhost:3001/join/'+id).origin,'http://localhost:3001');
+ for(const link of ['http://evil.test/join/'+id,'https://name:secret@site.test/join/'+id,'javascript:alert(1)','https://site.test/join/demo'])assert.throws(()=>sessionLink(link));
+ const windows=[{id:1,focused:true,state:'normal'}],tabs=[{active:true,windowId:1,url:'https://meet.google.com/abc-defg-hij?authuser=1'}];
+ assert.equal(meetIsActive('https://meet.google.com/abc-defg-hij',windows,tabs),true);
+ assert.equal(meetIsActive('https://meet.google.com/xyz-abcd-efg',windows,tabs),false);
+ assert.equal(meetIsActive('https://meet.google.com/abc-defg-hij',[{id:1,focused:false}],tabs),false);
+ assert.equal(meetIsActive('https://meet.google.com/abc-defg-hij',[{id:1,focused:true,state:'minimized'}],tabs),false);
+ assert.equal(meetIsActive('https://meet.google.com/abc-defg-hij',windows,[{...tabs[0],active:false}]),false);
+});
+test('real extension background: connect, switch tabs/windows, retry, finish, and isolate facilitator data',async()=>{
+ const app=createApp();await new Promise(r=>app.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+app.address().port;
+ const nativeFetch=globalThis.fetch,oldChrome=globalThis.chrome,extensionOrigin='chrome-extension://'+'a'.repeat(32);
+ const response=await nativeFetch(origin+'/api/monitor');const cookie=response.headers.get('set-cookie').split(';')[0];
+ const call=async(body,query='')=>{const r=await nativeFetch(origin+'/api/monitor'+query,{method:body?'POST':'GET',headers:{Cookie:cookie,'Content-Type':'application/json',Origin:origin},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json()};};
+ const created=await call({action:'create',kind:'meet',title:'Extension test',meetUrl:'https://meet.google.com/abc-defg-hij',duration:15});const sid=created.data.id;
+ const event=()=>({listeners:[],addListener(fn){this.listeners.push(fn);},fire(...args){for(const fn of this.listeners)fn(...args);}});
+ let memory={},windows=[{id:1,focused:true,state:'normal'}],tabs=[],outage=false;
+ const chrome={storage:{session:{get:async key=>structuredClone({[key]:memory[key]}),set:async value=>{memory={...memory,...structuredClone(value)};}}},permissions:{contains:async()=>true},windows:{getAll:async()=>windows,onFocusChanged:event()},tabs:{query:async()=>tabs,onActivated:event(),onUpdated:event(),onRemoved:event()},alarms:{create:async()=>{},clear:async()=>true,onAlarm:event()},action:{setBadgeText:async()=>{}},runtime:{id:'a'.repeat(32),getURL:path=>extensionOrigin+'/'+path,onMessage:event(),onStartup:event()}};
+ globalThis.chrome=chrome;
+ globalThis.fetch=async(input,options={})=>{if(outage)throw Error('Network unavailable');return nativeFetch(input,{...options,headers:{...options.headers,Origin:extensionOrigin}});};
+ try{
+  await import('./background.mjs?test');
+  const sender={id:chrome.runtime.id,url:chrome.runtime.getURL('popup.html')};
+  const message=body=>new Promise(resolve=>chrome.runtime.onMessage.listeners[0](body,sender,resolve));
+  const start=await message({action:'start',link:origin+'/join/'+sid,name:'Extension student',consent:true});assert.equal(start.ok,true);
+  assert.equal((await message({action:'status'})).state,'awaiting');
+  const snapshot=async()=>(await call(undefined,'?id='+sid)).data;
+  assert.equal((await snapshot()).participants[0].source,'meet_extension');
+  tabs=[{active:true,windowId:1,url:'https://meet.google.com/abc-defg-hij'}];chrome.tabs.onActivated.fire();await message({action:'status'});
+  assert.equal((await snapshot()).participants[0].state,'visible');
+  tabs=[{active:false,windowId:1,url:'https://meet.google.com/abc-defg-hij'}];chrome.tabs.onActivated.fire();await message({action:'status'});
+  assert.equal((await snapshot()).participants[0].state,'hidden');
+  const hiddenCount=(await snapshot()).events.filter(e=>e.type==='hidden').length;assert.equal(hiddenCount,1);
+  chrome.tabs.onUpdated.fire();await message({action:'status'});assert.equal((await snapshot()).events.filter(e=>e.type==='hidden').length,1,'Repeated background events must not duplicate exits');
+  tabs=[{active:true,windowId:1,url:'https://meet.google.com/abc-defg-hij'}];chrome.tabs.onActivated.fire();await message({action:'status'});
+  windows=[{id:1,focused:false}];chrome.windows.onFocusChanged.fire(-1);await message({action:'status'});assert.equal((await snapshot()).participants[0].state,'hidden');
+  outage=true;windows=[{id:1,focused:true,state:'normal'}];chrome.windows.onFocusChanged.fire(1);await message({action:'status'});assert.ok(memory.monitor.queue.length>0);
+  outage=false;chrome.alarms.onAlarm.fire({name:'monitor'});await message({action:'status'});assert.equal(memory.monitor.queue.length,0);assert.equal((await snapshot()).participants[0].state,'visible');
+  const foreignAdmin=await nativeFetch(origin+'/api/monitor',{method:'POST',headers:{Origin:extensionOrigin,Cookie:cookie,'Content-Type':'application/json'},body:JSON.stringify({action:'end',sessionId:sid})});assert.equal(foreignAdmin.status,403);
+  const foreignRead=await nativeFetch(origin+'/api/monitor?id='+sid,{headers:{Origin:extensionOrigin,Cookie:cookie}});assert.equal((await foreignRead.json()).signedIn,false);
+  const preflight=await nativeFetch(origin+'/api/monitor',{method:'OPTIONS',headers:{Origin:extensionOrigin,'Access-Control-Request-Method':'POST'}});assert.equal(preflight.status,204);assert.equal(preflight.headers.get('access-control-allow-origin'),extensionOrigin);
+  const finished=await message({action:'finish'});assert.equal(finished.ok,true);assert.equal((await message({action:'status'})).running,false);assert.ok((await snapshot()).participants[0].completed_at);
+ }finally{globalThis.fetch=nativeFetch;globalThis.chrome=oldChrome;await new Promise(r=>app.close(r));}
+});
