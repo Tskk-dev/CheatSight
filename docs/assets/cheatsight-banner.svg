@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="800" viewBox="0 0 2400 800" role="img" aria-labelledby="title desc">
+<title id="title">CheatSight</title>
+<desc id="desc">Green focus icon and white cheatsight wordmark on a dark background.</desc>
+<rect width="2400" height="800" fill="#0d0f0f"/>
+<g transform="translate(230 270) scale(2.6)" fill="none" stroke="#2bc787" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+<path d="M27 7H17Q7 7 7 17V27 M73 7H83Q93 7 93 17V27 M93 73V83Q93 93 83 93H73 M27 93H17Q7 93 7 83V73"/>
+<circle cx="50" cy="50" r="14"/>
+</g>
+<text x="740" y="476.0" fill="#e7ece9" font-family="Segoe UI, Arial, sans-serif" font-size="300" font-weight="700">cheatsight</text>
+</svg>

@@ -1,6 +1,14 @@
+![CheatSight — green focus icon and white wordmark on a dark background](docs/assets/cheatsight-banner.png)
+
 # CheatSight
 
 Google Forms tests and Google Meet sessions with transparent activity monitoring and downloadable facilitator logs. Built for Render's free Node web services. No persistent disk, database service, API key, or account system is required.
+
+## How to use CheatSight
+
+- **Teachers / facilitators:** [Create a session, invite students, monitor activity, and download logs](docs/FACILITATOR-GUIDE.md).
+- **Students:** [Install the Google Meet extension in Chrome or Edge and connect to your session](docs/STUDENT-GUIDE.md). Google Forms Test sessions do not require an extension.
+- **Download:** [CheatSight Chrome / Edge extension ZIP](https://github.com/Tskk-dev/CheatSight/raw/refs/heads/main/public/CheatSight-extension.zip). This is the unpacked testing version, not a browser-store listing.
 
 ## Start locally
 
@@ -34,7 +42,7 @@ Render's free service can sleep after inactivity and can restart. **All session 
 
 ## Facilitator flow
 
-1. Create a session and choose **Test** or **Google Meet**. Test requires a full published responder URL like `https://docs.google.com/forms/d/e/FORM_ID/viewform`. Google Meet requires a meeting URL like `https://meet.google.com/abc-defg-hij` and does not require a Google Form. Choose whether to include mouse activity. Form editor URLs and `forms.gle` short links are rejected; use the full responder link.
+1. Create a session and choose **Test** or **Google Meet**. Test requires a full published responder URL like `https://docs.google.com/forms/d/e/FORM_ID/viewform`. Google Meet requires a meeting URL like `https://meet.google.com/abc-defg-hij` and does not require a Google Form. Test sessions can optionally include mouse activity on CheatSight. Form editor URLs and `forms.gle` short links are rejected; use the full responder link.
 2. Copy the student link. Students enter a display name and acknowledge the monitoring notice before collection starts.
 3. Keep the dashboard open to see activity refresh every five seconds. Select a student for their event timeline. Search or filter the student table.
 4. Choose **Download logs** to save the complete chronological event log as CSV. **Session options → Download complete report (JSON)** also includes student summaries and session details. Downloads include every student in the selected session, regardless of the current table filter.
@@ -47,6 +55,8 @@ The initial dashboard is empty. `/join/demo` is a local sample student experienc
 ## Google Meet sessions
 
 Select **Google Meet** in the session type selector and paste the meeting link. No Google Form is required. Meet opens in a separate tab. To monitor whether students switch away from the assigned Meet tab/window, each student needs the included **Chrome/Edge extension**. Google API credentials are not required.
+
+Share the [step-by-step student installation guide](docs/STUDENT-GUIDE.md) before the session. It covers download, extraction, separate Chrome and Edge installation steps, connecting, finishing, and troubleshooting.
 
 The student page links to `CheatSight-extension.zip` and explains installation. Unzip it, open `chrome://extensions` or `edge://extensions`, enable Developer mode, choose **Load unpacked**, and select the unzipped folder. Open the extension, paste the CheatSight student session link, enter a name, acknowledge monitoring, and grant access to that specific CheatSight site. The host permission for Google Meet allows reading only matching Meet tab URLs; no broad browsing-history permission or content script is requested. The optional site permission is requested for the chosen CheatSight origin when connecting, not all websites at installation.
 
